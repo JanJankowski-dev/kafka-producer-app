@@ -3,11 +3,17 @@ server:
 
 app:
   kafka:
-    topic: events.v2
+    topic: investment.order-proposals.v1
 
 spring:
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9094}
     producer:
+      acks: all
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        "[spring.json.add.type.headers]": false
+        "[enable.idempotence]": true
+        "[delivery.timeout.ms]": 30000
+        "[request.timeout.ms]": 10000

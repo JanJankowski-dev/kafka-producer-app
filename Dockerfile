@@ -1,7 +1,7 @@
 FROM gradle:8.8-jdk17 AS build
 WORKDIR /app
 COPY . .
-RUN gradle clean bootJar --no-daemon
+RUN ./gradlew clean bootJar --no-daemon
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app
