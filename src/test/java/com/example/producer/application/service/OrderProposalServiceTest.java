@@ -47,7 +47,7 @@ class OrderProposalServiceTest {
         assertThat(publisher.event.schemaVersion()).isEqualTo(1);
         assertThat(publisher.event.proposal().proposalId()).isEqualTo(PROPOSAL_ID);
         assertThat(publisher.event.proposal().portfolioId()).isEqualTo(command().portfolioId());
-        assertThat(publisher.event.proposal().strategySource()).isEqualTo(ProposalSource.AI_LAB);
+        assertThat(publisher.event.proposal().source()).isEqualTo(ProposalSource.AI_LAB);
         assertThat(publisher.event.proposal().maxNotional().currency()).isEqualTo(Currency.getInstance("PLN"));
     }
 
@@ -64,7 +64,7 @@ class OrderProposalServiceTest {
                 command().instrumentId(),
                 command().side(),
                 command().maxNotional(),
-                command().strategySource(),
+                command().source(),
                 command().rationale(),
                 command().evidenceSources(),
                 command().confidence(),

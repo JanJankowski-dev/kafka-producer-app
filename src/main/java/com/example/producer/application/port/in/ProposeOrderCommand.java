@@ -15,7 +15,7 @@ public record ProposeOrderCommand(
         InstrumentId instrumentId,
         OrderSide side,
         NotionalLimit maxNotional,
-        ProposalSource strategySource,
+        ProposalSource source,
         String rationale,
         List<String> evidenceSources,
         Confidence confidence,

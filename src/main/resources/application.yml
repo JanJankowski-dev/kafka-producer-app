@@ -6,6 +6,14 @@ app:
     topic: investment.order-proposals.v1
 
 spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/investment_portfolio}
+    username: ${DB_USER:investment}
+    password: ${DB_PASSWORD:investment}
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+  jooq:
+    sql-dialect: POSTGRES
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9094}
     producer:

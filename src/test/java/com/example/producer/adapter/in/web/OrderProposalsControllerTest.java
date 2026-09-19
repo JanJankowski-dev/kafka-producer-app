@@ -27,7 +27,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = "spring.kafka.listener.auto-startup=false")
+@SpringBootTest(properties = {
+        "spring.kafka.listener.auto-startup=false",
+        "spring.liquibase.enabled=false"
+})
 class OrderProposalsControllerTest {
     @Autowired
     private WebApplicationContext context;
@@ -109,7 +112,7 @@ class OrderProposalsControllerTest {
                   "side": "%s",
                   "maxNotional": 123.45,
                   "currency": "PLN",
-                  "strategySource": "%s",
+                  "source": "%s",
                   "rationale": "Positive earnings revision",
                   "evidenceSources": ["https://example.com/report"],
                   "confidence": 0.72,

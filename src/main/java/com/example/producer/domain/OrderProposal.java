@@ -11,7 +11,7 @@ public record OrderProposal(
         InstrumentId instrumentId,
         OrderSide side,
         NotionalLimit maxNotional,
-        ProposalSource strategySource,
+        ProposalSource source,
         String rationale,
         List<String> evidenceSources,
         Confidence confidence,
@@ -23,7 +23,7 @@ public record OrderProposal(
         Objects.requireNonNull(instrumentId, "instrumentId must not be null");
         Objects.requireNonNull(side, "side must not be null");
         Objects.requireNonNull(maxNotional, "maxNotional must not be null");
-        Objects.requireNonNull(strategySource, "strategySource must not be null");
+        Objects.requireNonNull(source, "source must not be null");
         Objects.requireNonNull(rationale, "rationale must not be null");
         Objects.requireNonNull(evidenceSources, "evidenceSources must not be null");
         Objects.requireNonNull(confidence, "confidence must not be null");

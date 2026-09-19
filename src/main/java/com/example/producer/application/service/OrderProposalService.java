@@ -47,7 +47,7 @@ public class OrderProposalService implements ProposeOrderUseCase {
                     command.instrumentId(),
                     command.side(),
                     command.maxNotional(),
-                    command.strategySource(),
+                    command.source(),
                     command.rationale(),
                     command.evidenceSources(),
                     command.confidence(),

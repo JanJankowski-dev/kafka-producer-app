@@ -1,4 +1,4 @@
-package com.example.producer.adapter.out.kafka;
+package com.example.producer.adapter.out.messaging;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -15,7 +15,7 @@ public record OrderProposedV1(
         String side,
         BigDecimal maxNotional,
         String currency,
-        String strategySource,
+        String source,
         String rationale,
         List<String> evidenceSources,
         BigDecimal confidence,

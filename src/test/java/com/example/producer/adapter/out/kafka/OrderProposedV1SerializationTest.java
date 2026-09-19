@@ -1,5 +1,6 @@
 package com.example.producer.adapter.out.kafka;
 
+import com.example.producer.adapter.out.messaging.OrderProposedV1;
 import org.junit.jupiter.api.Test;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
@@ -28,7 +29,7 @@ class OrderProposedV1SerializationTest {
             assertThat(json).contains(
                     "\"maxNotional\":12345678901234567890.123456789",
                     "\"confidence\":0.72",
-                    "\"strategySource\":\"AI_LAB\"",
+                    "\"source\":\"AI_LAB\"",
                     "\"evidenceSources\":[\"https://example.com/report\"]"
             );
             assertThat(deserialized.maxNotional()).isEqualByComparingTo(event.maxNotional());

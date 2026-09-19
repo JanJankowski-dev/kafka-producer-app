@@ -1,5 +1,6 @@
 package com.example.producer.adapter.out.kafka;
 
+import com.example.producer.adapter.out.messaging.OrderProposedV1;
 import com.example.producer.domain.Confidence;
 import com.example.producer.domain.InstrumentId;
 import com.example.producer.domain.NotionalLimit;
@@ -61,7 +62,7 @@ class KafkaOrderProposalPublisherTest {
         assertThat(contract.eventId()).isEqualTo(event.eventId());
         assertThat(contract.proposalId()).isEqualTo(event.proposal().proposalId());
         assertThat(contract.side()).isEqualTo("BUY");
-        assertThat(contract.strategySource()).isEqualTo("AI_LAB");
+        assertThat(contract.source()).isEqualTo("AI_LAB");
         assertThat(contract.maxNotional()).isEqualByComparingTo("123.45");
         assertThat(contract.currency()).isEqualTo("PLN");
     }

@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - include:
+      file: changes/001-create-order-proposals.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/002-create-outbox-events.sql
+      relativeToChangelogFile: true
