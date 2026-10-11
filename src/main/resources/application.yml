@@ -2,8 +2,29 @@ server:
   port: 8080
 
 app:
+  private-http:
+    enabled: ${APP_REQUIRE_AUTH:false}
+    deployment: ${APP_DEPLOYMENT_MODE:false}
+    user: ${APP_HTTP_USER:}
+    password: ${APP_HTTP_PASSWORD:}
+  ai:
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_MODEL:gpt-5.4-mini}
+    external-market-data-sharing-allowed: ${APP_EXTERNAL_MARKET_DATA_SHARING_ALLOWED:false}
+  market-data:
+    local-mode: ${MARKET_DATA_LOCAL_MODE:false}
+    eodhd-token: ${EODHD_API_KEY:}
+    daily-enabled: ${MARKET_DAILY_ENABLED:false}
   kafka:
     topic: investment.order-proposals.v1
+  outbox:
+    enabled: true
+    batch-size: 50
+    poll-delay-ms: 1000
+    lease-duration: 30s
+    max-attempts: 5
+    retry-base-delay: 2s
+    retry-max-delay: 1m
 
 spring:
   datasource:

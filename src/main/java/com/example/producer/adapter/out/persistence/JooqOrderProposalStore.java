@@ -1,6 +1,9 @@
 package com.example.producer.adapter.out.persistence;
 
+import com.example.producer.application.port.in.OrderProposalAccepted;
+import com.example.producer.application.port.out.AcceptOrderProposalPort;
 import com.example.producer.application.port.out.StoreOrderProposalPort;
+import com.example.producer.application.service.IdempotencyConflictException;
 import com.example.producer.domain.OrderProposal;
 import com.example.producer.domain.OrderProposalProposed;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -14,15 +17,17 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import static com.example.producer.adapter.out.messaging.OrderProposedV1Mapper.from;
+import static com.example.producer.jooq.tables.IdempotencyRequests.IDEMPOTENCY_REQUESTS;
 import static com.example.producer.jooq.tables.OrderProposalEvidenceSources.ORDER_PROPOSAL_EVIDENCE_SOURCES;
 import static com.example.producer.jooq.tables.OrderProposals.ORDER_PROPOSALS;
 import static com.example.producer.jooq.tables.OutboxEvents.OUTBOX_EVENTS;
 
 @Repository
-public class JooqOrderProposalStore implements StoreOrderProposalPort {
+public class JooqOrderProposalStore implements StoreOrderProposalPort, AcceptOrderProposalPort {
     private static final String AGGREGATE_TYPE = "ORDER_PROPOSAL";
     private static final String EVENT_TYPE = "OrderProposedV1";
 
@@ -40,6 +45,50 @@ public class JooqOrderProposalStore implements StoreOrderProposalPort {
         insertProposal(event);
         insertEvidenceSources(event.proposal());
         insertOutboxEvent(event);
+    }
+
+    @Override
+    @Transactional
+    public OrderProposalAccepted accept(
+            String idempotencyKey,
+            String requestFingerprint,
+            Supplier<OrderProposalProposed> newEvent
+    ) {
+        int claimed = dsl.insertInto(IDEMPOTENCY_REQUESTS)
+                .set(IDEMPOTENCY_REQUESTS.IDEMPOTENCY_KEY, idempotencyKey)
+                .set(IDEMPOTENCY_REQUESTS.REQUEST_FINGERPRINT, requestFingerprint)
+                .onConflict(IDEMPOTENCY_REQUESTS.IDEMPOTENCY_KEY)
+                .doNothing()
+                .execute();
+
+        if (claimed == 0) {
+            var existing = dsl.selectFrom(IDEMPOTENCY_REQUESTS)
+                    .where(IDEMPOTENCY_REQUESTS.IDEMPOTENCY_KEY.eq(idempotencyKey))
+                    .fetchOne();
+            if (existing == null) {
+                throw new IllegalStateException("Idempotency request disappeared: " + idempotencyKey);
+            }
+            if (!requestFingerprint.equals(existing.get(IDEMPOTENCY_REQUESTS.REQUEST_FINGERPRINT))) {
+                throw new IdempotencyConflictException();
+            }
+            var eventId = existing.get(IDEMPOTENCY_REQUESTS.RESPONSE_EVENT_ID);
+            var proposalId = existing.get(IDEMPOTENCY_REQUESTS.RESPONSE_PROPOSAL_ID);
+            if (eventId == null || proposalId == null) {
+                throw new IllegalStateException("Idempotency request has no response: " + idempotencyKey);
+            }
+            return new OrderProposalAccepted(eventId, proposalId);
+        }
+
+        OrderProposalProposed event = newEvent.get();
+        insertProposal(event);
+        insertEvidenceSources(event.proposal());
+        insertOutboxEvent(event);
+        dsl.update(IDEMPOTENCY_REQUESTS)
+                .set(IDEMPOTENCY_REQUESTS.RESPONSE_EVENT_ID, event.eventId())
+                .set(IDEMPOTENCY_REQUESTS.RESPONSE_PROPOSAL_ID, event.proposal().proposalId())
+                .where(IDEMPOTENCY_REQUESTS.IDEMPOTENCY_KEY.eq(idempotencyKey))
+                .execute();
+        return new OrderProposalAccepted(event.eventId(), event.proposal().proposalId());
     }
 
     private void insertProposal(OrderProposalProposed event) {

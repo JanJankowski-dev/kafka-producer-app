@@ -12,6 +12,8 @@ CREATE TABLE outbox_events (
     status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
     attempts INTEGER NOT NULL DEFAULT 0,
     next_attempt_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    claim_id UUID,
+    claimed_until TIMESTAMP WITH TIME ZONE,
     occurred_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     published_at TIMESTAMP WITH TIME ZONE,
@@ -30,6 +32,16 @@ CREATE TABLE outbox_events (
         CHECK (status IN ('PENDING', 'PUBLISHED', 'DEAD')),
     CONSTRAINT chk_outbox_events_attempts
         CHECK (attempts >= 0),
+    CONSTRAINT chk_outbox_events_claim
+        CHECK (
+            (claim_id IS NULL AND claimed_until IS NULL)
+            OR (claim_id IS NOT NULL AND claimed_until IS NOT NULL)
+        ),
+    CONSTRAINT chk_outbox_events_terminal_claim
+        CHECK (
+            status = 'PENDING'
+            OR (claim_id IS NULL AND claimed_until IS NULL)
+        ),
     CONSTRAINT chk_outbox_events_published_at
         CHECK (
             (status = 'PUBLISHED' AND published_at IS NOT NULL)
@@ -38,7 +50,7 @@ CREATE TABLE outbox_events (
 );
 
 CREATE INDEX idx_outbox_events_pending
-    ON outbox_events (next_attempt_at, occurred_at, event_id)
+    ON outbox_events (next_attempt_at, claimed_until, occurred_at, event_id)
     WHERE status = 'PENDING';
 
 --rollback DROP TABLE outbox_events;

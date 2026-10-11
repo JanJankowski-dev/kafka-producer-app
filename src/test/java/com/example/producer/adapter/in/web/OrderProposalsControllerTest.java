@@ -11,25 +11,23 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
         "spring.kafka.listener.auto-startup=false",
-        "spring.liquibase.enabled=false"
+        "spring.liquibase.enabled=false",
+        "app.outbox.enabled=false"
 })
 class OrderProposalsControllerTest {
     @Autowired
@@ -42,16 +40,10 @@ class OrderProposalsControllerTest {
     void shouldReturnAcceptedResponse() throws Exception {
         var eventId = UUID.fromString("269ad5c6-69ea-4f88-8f21-aa4e283db26e");
         var proposalId = UUID.fromString("59bd5b26-0c71-4bac-aad4-80e73c9bd9a8");
-        when(useCase.propose(any(ProposeOrderCommand.class)))
-                .thenReturn(CompletableFuture.completedFuture(
-                        new OrderProposalAccepted(eventId, proposalId)
-                ));
+        when(useCase.propose(anyString(), any(ProposeOrderCommand.class)))
+                .thenReturn(new OrderProposalAccepted(eventId, proposalId));
 
-        MvcResult pending = mockMvc().perform(validRequest())
-                .andExpect(request().asyncStarted())
-                .andReturn();
-
-        mockMvc().perform(asyncDispatch(pending))
+        mockMvc().perform(validRequest())
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.eventId").value(eventId.toString()))
                 .andExpect(jsonPath("$.proposalId").value(proposalId.toString()));
@@ -60,36 +52,36 @@ class OrderProposalsControllerTest {
     @Test
     void shouldReturnBadRequestForNegativeNotional() throws Exception {
         mockMvc().perform(MockMvcRequestBuilders.post("/order-proposals")
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validJson().replace("123.45", "-1")))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
+    void shouldRequireIdempotencyKey() throws Exception {
+        mockMvc().perform(MockMvcRequestBuilders.post("/order-proposals")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validJson()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void shouldReturnBadRequestForUnknownCurrency() throws Exception {
-        MvcResult pending = mockMvc().perform(MockMvcRequestBuilders.post("/order-proposals")
+        mockMvc().perform(MockMvcRequestBuilders.post("/order-proposals")
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validJson().replace("PLN", "ZZZ")))
-                .andExpect(request().asyncStarted())
-                .andReturn();
-
-        mockMvc().perform(asyncDispatch(pending))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_ORDER_PROPOSAL"));
     }
 
     @Test
-    void shouldReturnServiceUnavailableWhenPublishingFails() throws Exception {
-        when(useCase.propose(any(ProposeOrderCommand.class)))
-                .thenReturn(CompletableFuture.failedFuture(
-                        new RuntimeException("Kafka unavailable")
-                ));
+    void shouldReturnServiceUnavailableWhenStoringFails() throws Exception {
+        when(useCase.propose(anyString(), any(ProposeOrderCommand.class)))
+                .thenThrow(new RuntimeException("Database unavailable"));
 
-        MvcResult pending = mockMvc().perform(validRequest())
-                .andExpect(request().asyncStarted())
-                .andReturn();
-
-        mockMvc().perform(asyncDispatch(pending))
+        mockMvc().perform(validRequest())
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.code").value("ORDER_PROPOSAL_UNAVAILABLE"));
     }
@@ -100,6 +92,7 @@ class OrderProposalsControllerTest {
 
     private MockHttpServletRequestBuilder validRequest() {
         return MockMvcRequestBuilders.post("/order-proposals")
+                .header("Idempotency-Key", UUID.randomUUID().toString())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(validJson());
     }

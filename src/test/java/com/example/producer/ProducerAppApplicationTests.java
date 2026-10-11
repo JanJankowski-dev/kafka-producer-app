@@ -3,7 +3,10 @@ package com.example.producer;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest(properties = "spring.liquibase.enabled=false")
+@SpringBootTest(properties = {
+		"spring.liquibase.enabled=false",
+		"app.outbox.enabled=false"
+})
 class ProducerAppApplicationTests {
 
 	@Test

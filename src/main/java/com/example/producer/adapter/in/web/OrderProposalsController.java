@@ -2,17 +2,16 @@ package com.example.producer.adapter.in.web;
 
 import com.example.producer.application.port.in.OrderProposalAccepted;
 import com.example.producer.application.port.in.ProposeOrderUseCase;
+import com.example.producer.application.service.IdempotencyConflictException;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 
 @RestController
 @RequestMapping("/order-proposals")
@@ -25,62 +24,39 @@ public class OrderProposalsController {
     }
 
     @PostMapping
-    public CompletableFuture<ResponseEntity<?>> propose(
+    public ResponseEntity<?> propose(
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
             @Valid @RequestBody CreateOrderProposalRequest request
     ) {
         try {
-            return handleResult(
-                    request,
-                    useCase.propose(request.toCommand()).toCompletableFuture()
+            OrderProposalAccepted accepted = useCase.propose(idempotencyKey, request.toCommand());
+            return ResponseEntity.accepted().body(
+                    new OrderProposalAcceptedResponse(
+                            accepted.eventId(),
+                            accepted.proposalId()
+                    )
+            );
+        } catch (IdempotencyConflictException exception) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                    new ApiErrorResponse("IDEMPOTENCY_KEY_CONFLICT", exception.getMessage())
             );
         } catch (IllegalArgumentException exception) {
-            ResponseEntity<?> response = ResponseEntity.badRequest().body(
+            return ResponseEntity.badRequest().body(
                     new ApiErrorResponse("INVALID_ORDER_PROPOSAL", exception.getMessage())
             );
-            return CompletableFuture.completedFuture(response);
+        } catch (RuntimeException exception) {
+            log.error(
+                    "Order proposal store failed portfolioId={} instrumentId={}",
+                    request.portfolioId(),
+                    request.instrumentId(),
+                    exception
+            );
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                    new ApiErrorResponse(
+                            "ORDER_PROPOSAL_UNAVAILABLE",
+                            "Order proposal could not be accepted"
+                    )
+            );
         }
-    }
-
-    private CompletableFuture<ResponseEntity<?>> handleResult(
-            CreateOrderProposalRequest request,
-            CompletableFuture<OrderProposalAccepted> result
-    ) {
-        return result
-                .handle((accepted, error) -> {
-                    if (error == null) {
-                        return ResponseEntity.accepted().body(
-                                new OrderProposalAcceptedResponse(
-                                        accepted.eventId(),
-                                        accepted.proposalId()
-                                )
-                        );
-                    }
-
-                    Throwable cause = unwrap(error);
-                    if (cause instanceof IllegalArgumentException) {
-                        return ResponseEntity.badRequest().body(
-                                new ApiErrorResponse("INVALID_ORDER_PROPOSAL", cause.getMessage())
-                        );
-                    }
-
-                    log.error(
-                            "Order proposal publish failed portfolioId={} instrumentId={}",
-                            request.portfolioId(),
-                            request.instrumentId(),
-                            cause
-                    );
-                    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
-                            new ApiErrorResponse(
-                                    "ORDER_PROPOSAL_UNAVAILABLE",
-                                    "Order proposal could not be published"
-                            )
-                    );
-                });
-    }
-
-    private Throwable unwrap(Throwable error) {
-        return error instanceof CompletionException && error.getCause() != null
-                ? error.getCause()
-                : error;
     }
 }

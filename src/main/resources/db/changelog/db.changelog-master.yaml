@@ -5,3 +5,30 @@ databaseChangeLog:
   - include:
       file: changes/002-create-outbox-events.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/003-create-idempotency-requests.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/004-market-research-and-paper-portfolio.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/005-paper-session-workflow.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/006-real-market-imports.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/007-strategy-comparisons.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/008-daily-paper-valuations.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/009-autonomous-paper.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/010-etf-benchmark-navs.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/011-etf-benchmark-market-closes.sql
+      relativeToChangelogFile: true

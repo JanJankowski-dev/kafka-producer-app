@@ -9,7 +9,6 @@ import com.example.producer.domain.PortfolioId;
 import com.example.producer.domain.ProposalSource;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -31,7 +30,7 @@ public record CreateOrderProposalRequest(
         @NotBlank @Size(max = 2000) String rationale,
         @NotNull @Size(max = 20) List<@NotBlank @Size(max = 2048) String> evidenceSources,
         @NotNull @DecimalMin("0") @DecimalMax("1") BigDecimal confidence,
-        @NotNull @Future Instant validUntil
+        @NotNull Instant validUntil
 ) {
     ProposeOrderCommand toCommand() {
         return new ProposeOrderCommand(

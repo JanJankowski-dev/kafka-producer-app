@@ -1,7 +1,8 @@
 package com.example.producer.application.service;
 
+import com.example.producer.application.port.in.OrderProposalAccepted;
 import com.example.producer.application.port.in.ProposeOrderCommand;
-import com.example.producer.application.port.out.PublishOrderProposalPort;
+import com.example.producer.application.port.out.AcceptOrderProposalPort;
 import com.example.producer.domain.Confidence;
 import com.example.producer.domain.InstrumentId;
 import com.example.producer.domain.NotionalLimit;
@@ -19,9 +20,10 @@ import java.util.ArrayDeque;
 import java.util.Currency;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class OrderProposalServiceTest {
     private static final Instant NOW = Instant.parse("2026-09-12T10:00:00Z");
@@ -29,33 +31,33 @@ class OrderProposalServiceTest {
     private static final UUID PROPOSAL_ID = UUID.fromString("59bd5b26-0c71-4bac-aad4-80e73c9bd9a8");
 
     @Test
-    void shouldCreateProposalAndPublishDomainEvent() {
-        var publisher = new CapturingPublisher();
+    void shouldCreateAndStoreProposalWithDomainEvent() {
+        var store = new CapturingStore();
         var ids = new ArrayDeque<>(List.of(EVENT_ID, PROPOSAL_ID));
         var service = new OrderProposalService(
-                publisher,
+                store,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 ids::removeFirst
         );
 
-        var accepted = service.propose(command()).toCompletableFuture().join();
+        var accepted = service.propose("request-1", command());
 
         assertThat(accepted.eventId()).isEqualTo(EVENT_ID);
         assertThat(accepted.proposalId()).isEqualTo(PROPOSAL_ID);
-        assertThat(publisher.event.eventId()).isEqualTo(EVENT_ID);
-        assertThat(publisher.event.occurredAt()).isEqualTo(NOW);
-        assertThat(publisher.event.schemaVersion()).isEqualTo(1);
-        assertThat(publisher.event.proposal().proposalId()).isEqualTo(PROPOSAL_ID);
-        assertThat(publisher.event.proposal().portfolioId()).isEqualTo(command().portfolioId());
-        assertThat(publisher.event.proposal().source()).isEqualTo(ProposalSource.AI_LAB);
-        assertThat(publisher.event.proposal().maxNotional().currency()).isEqualTo(Currency.getInstance("PLN"));
+        assertThat(store.event.eventId()).isEqualTo(EVENT_ID);
+        assertThat(store.event.occurredAt()).isEqualTo(NOW);
+        assertThat(store.event.schemaVersion()).isEqualTo(1);
+        assertThat(store.event.proposal().proposalId()).isEqualTo(PROPOSAL_ID);
+        assertThat(store.event.proposal().portfolioId()).isEqualTo(command().portfolioId());
+        assertThat(store.event.proposal().source()).isEqualTo(ProposalSource.AI_LAB);
+        assertThat(store.event.proposal().maxNotional().currency()).isEqualTo(Currency.getInstance("PLN"));
     }
 
     @Test
-    void shouldRejectExpiredProposalWithoutCallingPublisher() {
-        var publisher = new CapturingPublisher();
+    void shouldRejectExpiredProposalWithoutCallingStore() {
+        var store = new CapturingStore();
         var service = new OrderProposalService(
-                publisher,
+                store,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 UUID::randomUUID
         );
@@ -71,10 +73,10 @@ class OrderProposalServiceTest {
                 NOW
         );
 
-        var future = service.propose(expired).toCompletableFuture();
-
-        assertThat(future).isCompletedExceptionally();
-        assertThat(publisher.event).isNull();
+        assertThatThrownBy(() -> service.propose("request-2", expired))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("validUntil must be after occurredAt");
+        assertThat(store.event).isNull();
     }
 
     private ProposeOrderCommand command() {
@@ -91,13 +93,17 @@ class OrderProposalServiceTest {
         );
     }
 
-    private static final class CapturingPublisher implements PublishOrderProposalPort {
+    private static final class CapturingStore implements AcceptOrderProposalPort {
         private OrderProposalProposed event;
 
         @Override
-        public CompletableFuture<Void> publish(OrderProposalProposed event) {
-            this.event = event;
-            return CompletableFuture.completedFuture(null);
+        public OrderProposalAccepted accept(
+                String idempotencyKey,
+                String requestFingerprint,
+                Supplier<OrderProposalProposed> newEvent
+        ) {
+            event = newEvent.get();
+            return new OrderProposalAccepted(event.eventId(), event.proposal().proposalId());
         }
     }
 }

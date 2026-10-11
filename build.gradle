@@ -44,7 +44,7 @@ jooq {
 		generator {
 				database {
 					name = 'org.jooq.meta.extensions.ddl.DDLDatabase'
-					includes = 'order_proposals|order_proposal_evidence_sources|outbox_events'
+					includes = 'order_proposals|order_proposal_evidence_sources|outbox_events|idempotency_requests|market_snapshots|market_instruments|market_daily_closes|screening_runs|screening_signals|paper_portfolios|paper_cash|paper_positions|paper_trades|paper_orders|market_import_batches|market_import_bars|strategy_comparisons|paper_daily_valuations|paper_auto_decisions|paper_auto_orders|etf_benchmark_navs|etf_benchmark_market_closes'
 					forcedTypes {
 						forcedType {
 							name = 'JSONB'
@@ -84,6 +84,12 @@ jooq {
 
 tasks.named('compileJava') {
 	dependsOn(tasks.named('jooqCodegen'))
+}
+
+tasks.named('processResources') {
+	from('frontend/dist') {
+		into 'static'
+	}
 }
 
 tasks.named('test') {
